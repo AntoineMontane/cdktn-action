@@ -1,0 +1,5 @@
+* text=auto eol=lf
+
+# dist/ is a generated bundle that is committed on main (verified by check-dist).
+# Collapse it in diffs and mark it generated so it stays out of code review.
+dist/** -diff linguist-generated=true

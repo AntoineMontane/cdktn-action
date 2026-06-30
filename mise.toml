@@ -1,0 +1,22 @@
+# Pinned developer toolchain for cdk-terrain-action.
+# Install everything with:  mise install
+#
+# Node is the build runtime (also declared in package.json "engines").
+# actionlint + zizmor are the GitHub Actions linters/security scanners used
+# locally and in CI (no good npm distribution, so they live here).
+[tools]
+node = "24"
+actionlint = "1.7"
+zizmor = "1"
+
+[tasks.install]
+description = "Install npm dependencies"
+run = "npm ci"
+
+[tasks.build]
+description = "Type-check, lint, test and bundle dist/"
+run = "npm run all"
+
+[tasks.lint-actions]
+description = "Lint and security-scan the GitHub Actions workflows"
+run = ["actionlint", "zizmor ."]

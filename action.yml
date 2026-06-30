@@ -1,0 +1,68 @@
+name: cdk-terrain-action
+description: Run CDK for Terraform (CDKTF) — synth, plan, apply or destroy — as part of your CI/CD workflow.
+author: Open Constructs
+
+branding:
+  icon: terminal
+  color: purple
+
+inputs:
+  cdktfVersion:
+    description: Version of the cdktf-cli to run (fetched on demand via npx).
+    required: false
+    default: 0.21.0
+  terraformVersion:
+    description: >-
+      Terraform version that must already be on PATH. This action verifies the
+      version but does not install it; use hashicorp/setup-terraform first.
+    required: false
+    default: 1.13.3
+  workingDirectory:
+    description: Directory the CDKTF project lives in.
+    required: false
+    default: ./
+  mode:
+    description: >-
+      What to run: `synth-only` (synthesize), `plan-only` (plan a stack),
+      `auto-approve-apply` (plan then apply --auto-approve), or
+      `auto-approve-destroy` (plan then destroy --auto-approve).
+    required: true
+  stackName:
+    description: Stack to operate on. Required for every mode except `synth-only`.
+    required: false
+  terraformCloudToken:
+    description: HCP Terraform / Terraform Enterprise API token (exported as TF_TOKEN_app_terraform_io).
+    required: false
+  githubToken:
+    description: Token used to post the result as a pull request comment. No comment is posted if omitted.
+    required: false
+  commentOnPr:
+    description: Whether to post the run result as a comment on the associated pull request.
+    required: false
+    default: "true"
+  updateComment:
+    description: Update the previous comment for this configuration instead of adding a new one.
+    required: false
+    default: "true"
+  customNpxArgs:
+    description: Extra CLI arguments passed to `npx` before the cdktf-cli package.
+    required: false
+    default: ""
+  cdktfArgs:
+    description: Extra CLI arguments passed to the `cdktf` command.
+    required: false
+    default: ""
+  suppressOutput:
+    description: Omit the captured CDKTF output from the pull request comment.
+    required: false
+    default: "false"
+
+outputs:
+  exitCode:
+    description: Exit code returned by the cdktf-cli invocation.
+  output:
+    description: Combined stdout/stderr captured from the cdktf-cli invocation.
+
+runs:
+  using: node24
+  main: dist/index.js

@@ -1,0 +1,44 @@
+name: Check dist
+
+# The bundled dist/ is committed on main (so GitHub can run the action directly
+# at any ref). This workflow rebuilds it and fails if the committed bundle drifts
+# from source — guaranteeing "what the tag runs == reviewed source".
+
+on:
+  push:
+    branches: [main]
+    paths: ['src/**', 'package.json', 'package-lock.json', 'rolldown.config.ts', 'tsconfig.json']
+  pull_request:
+    paths: ['src/**', 'package.json', 'package-lock.json', 'rolldown.config.ts', 'tsconfig.json']
+
+permissions: {}
+
+jobs:
+  check-dist:
+    name: Verify dist/ is up to date
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - name: Set up toolchain
+        uses: jdx/mise-action@e6a8b3978addb5a52f2b4cd9d91eafa7f0ab959d # v4.2.0
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Rebuild dist/
+        run: npm run package
+
+      - name: Compare committed dist/ with fresh build
+        run: |
+          if [ -n "$(git status --porcelain dist/)" ]; then
+            echo "::error::dist/ is out of date. Run 'npm run package' and commit the result."
+            git diff --stat -- dist/
+            exit 1
+          fi
+          echo "dist/ is up to date."

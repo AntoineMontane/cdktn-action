@@ -1,0 +1,75 @@
+name: Release
+
+# Pattern 1 releases: a maintainer tags a commit on main that already contains a
+# verified dist/. This workflow re-verifies the bundle, attaches build provenance,
+# moves the floating major/minor tags, and publishes the GitHub release.
+
+on:
+  push:
+    tags: ['v*.*.*']
+
+permissions: {}
+
+jobs:
+  release:
+    name: Verify, attest & publish
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # create release + move floating tags
+      id-token: write # provenance signing (OIDC)
+      attestations: write # write build provenance attestation
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up toolchain
+        uses: jdx/mise-action@e6a8b3978addb5a52f2b4cd9d91eafa7f0ab959d # v4.2.0
+        with:
+          cache: false # avoid cache poisoning in a publishing workflow
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Test
+        run: npm test
+
+      - name: Rebuild dist/
+        run: npm run package
+
+      - name: Verify the tagged dist/ matches a fresh build
+        run: |
+          if [ -n "$(git status --porcelain dist/)" ]; then
+            echo "::error::dist/ at this tag is stale. Tag a commit built with 'npm run package'."
+            git diff --stat -- dist/
+            exit 1
+          fi
+
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373 # v4.1.1
+        with:
+          subject-path: dist/index.js
+
+      - name: Move floating major/minor tags
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          major="${TAG%%.*}"   # v1.2.3 -> v1
+          minor="${TAG%.*}"    # v1.2.3 -> v1.2
+          remote="https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          for alias in "$major" "$minor"; do
+            git tag -f "$alias" "$TAG"
+            git push -f "$remote" "refs/tags/$alias"
+          done
+
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: gh release create "$TAG" --generate-notes --verify-tag
