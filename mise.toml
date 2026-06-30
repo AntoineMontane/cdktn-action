@@ -1,11 +1,16 @@
 # Pinned developer toolchain for cdk-terrain-action.
 # Install everything with:  mise install
 #
-# Node is the build runtime (also declared in package.json "engines").
+# The Node version is the single source of truth in .nvmrc; mise only reads
+# idiomatic version files (.nvmrc/.node-version) when explicitly enabled below.
 # actionlint + zizmor are the GitHub Actions linters/security scanners used
 # locally and in CI (no good npm distribution, so they live here).
+[settings]
+idiomatic_version_file_enable_tools = ["node"]
+
+# Note: `node` is intentionally NOT listed here — its version comes from .nvmrc.
+# A [tools] entry would take precedence over the idiomatic file and defeat that.
 [tools]
-node = "24"
 actionlint = "1.7"
 zizmor = "1"
 

@@ -2,7 +2,22 @@
 // Copyright The CDK Terrain Contributors
 
 import * as core from '@actions/core'
-import { type ActionInputs, Engine, ExecutionMode, modeRequiresStack } from './models.js'
+import {
+  type ActionInputs,
+  ENGINE_AUTO,
+  Engine,
+  type EnginePreference,
+  ExecutionMode,
+  modeRequiresStack,
+} from './models.js'
+
+function parseEngine(raw: string): EnginePreference {
+  const valid = [ENGINE_AUTO, ...Object.values(Engine)]
+  if (!valid.includes(raw)) {
+    throw new Error(`Invalid engine "${raw}". Expected one of: ${valid.join(', ')}.`)
+  }
+  return raw as EnginePreference
+}
 
 /**
  * Read a canonical input, falling back to a deprecated alias for migration ease.
@@ -52,7 +67,7 @@ export function getInputs(): ActionInputs {
   return {
     cdktnVersion,
     cdktfVersion,
-    engine: parseEnum(core.getInput('engine') || Engine.OpenTofu, Engine, 'engine'),
+    engine: parseEngine(core.getInput('engine') || ENGINE_AUTO),
     engineVersion: withDeprecated('engineVersion', 'terraformVersion'),
     workingDirectory: core.getInput('workingDirectory') || './',
     mode,

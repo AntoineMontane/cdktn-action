@@ -14,9 +14,11 @@ inputs:
     description: "Deprecated: version of the legacy cdktf-cli to run instead of cdktn-cli. Prefer cdktnVersion."
     required: false
   engine:
-    description: Provisioning engine to drive — `tofu` (OpenTofu, default) or `terraform`.
+    description: >-
+      Provisioning engine to drive: `auto` (default — detect from PATH, preferring
+      OpenTofu), `tofu` (OpenTofu) or `terraform`. Sets TERRAFORM_BINARY_NAME.
     required: false
-    default: tofu
+    default: auto
   engineVersion:
     description: >-
       Exact engine version that must already be on PATH. The action verifies but

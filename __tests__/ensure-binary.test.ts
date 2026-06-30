@@ -3,43 +3,53 @@
 
 import * as exec from '@actions/exec'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { ensureBinary } from '../src/ensure-binary.js'
-import { Engine } from '../src/models.js'
+import { resolveEngine } from '../src/ensure-binary.js'
+import { ENGINE_AUTO, Engine } from '../src/models.js'
 
 vi.mock('@actions/exec')
 
-function mockVersion(stdout: string, exitCode = 0): void {
-  vi.mocked(exec.getExecOutput).mockResolvedValue({ exitCode, stdout, stderr: '' })
+/** Mock `<binary> version` per engine: a string => that version, undefined => not on PATH. */
+function onPath(versions: Partial<Record<Engine, string | undefined>>): void {
+  vi.mocked(exec.getExecOutput).mockImplementation(async (cmd) => {
+    const v = versions[cmd as Engine]
+    if (v === undefined) throw new Error(`${cmd}: not found`)
+    return { exitCode: 0, stdout: v, stderr: '' }
+  })
 }
 
-describe('ensureBinary', () => {
+describe('resolveEngine', () => {
   beforeEach(() => {
     vi.resetAllMocks()
   })
 
-  it('accepts a present OpenTofu binary when no version is required', async () => {
-    mockVersion('OpenTofu v1.12.3\non linux_amd64')
-    await expect(ensureBinary(Engine.OpenTofu, '')).resolves.toBeUndefined()
-    expect(exec.getExecOutput).toHaveBeenCalledWith('tofu', ['version'], expect.anything())
+  it('uses an explicitly requested engine', async () => {
+    onPath({ [Engine.Terraform]: 'Terraform v1.13.3' })
+    await expect(resolveEngine(Engine.Terraform, '')).resolves.toBe(Engine.Terraform)
   })
 
-  it('accepts a matching exact version', async () => {
-    mockVersion('Terraform v1.13.3')
-    await expect(ensureBinary(Engine.Terraform, '1.13.3')).resolves.toBeUndefined()
+  it('auto prefers OpenTofu when both are present', async () => {
+    onPath({ [Engine.OpenTofu]: 'OpenTofu v1.12.3', [Engine.Terraform]: 'Terraform v1.13.3' })
+    await expect(resolveEngine(ENGINE_AUTO, '')).resolves.toBe(Engine.OpenTofu)
   })
 
-  it('throws on a version mismatch', async () => {
-    mockVersion('OpenTofu v1.12.3')
-    await expect(ensureBinary(Engine.OpenTofu, '1.10.0')).rejects.toThrow(/Expected tofu 1\.10\.0/)
+  it('auto falls back to Terraform when OpenTofu is absent', async () => {
+    onPath({ [Engine.OpenTofu]: undefined, [Engine.Terraform]: 'Terraform v1.13.3' })
+    await expect(resolveEngine(ENGINE_AUTO, '')).resolves.toBe(Engine.Terraform)
   })
 
-  it('points at the right setup action when the binary is missing', async () => {
-    vi.mocked(exec.getExecOutput).mockRejectedValue(new Error('ENOENT'))
-    await expect(ensureBinary(Engine.Terraform, '')).rejects.toThrow(/hashicorp\/setup-terraform/)
+  it('auto throws when neither engine is installed', async () => {
+    onPath({})
+    await expect(resolveEngine(ENGINE_AUTO, '')).rejects.toThrow(/Neither "tofu" nor "terraform"/)
   })
 
-  it('points at setup-opentofu for OpenTofu', async () => {
-    vi.mocked(exec.getExecOutput).mockRejectedValue(new Error('ENOENT'))
-    await expect(ensureBinary(Engine.OpenTofu, '')).rejects.toThrow(/opentofu\/setup-opentofu/)
+  it('enforces an exact version when provided', async () => {
+    onPath({ [Engine.OpenTofu]: 'OpenTofu v1.12.3' })
+    await expect(resolveEngine(Engine.OpenTofu, '1.10.0')).rejects.toThrow(/Expected tofu 1\.10\.0/)
+    await expect(resolveEngine(Engine.OpenTofu, '1.12.3')).resolves.toBe(Engine.OpenTofu)
+  })
+
+  it('points at the right setup action for an explicit missing engine', async () => {
+    onPath({})
+    await expect(resolveEngine(Engine.Terraform, '')).rejects.toThrow(/hashicorp\/setup-terraform/)
   })
 })

@@ -18,13 +18,19 @@ export function modeRequiresStack(mode: ExecutionMode): boolean {
   return mode !== ExecutionMode.SynthOnly
 }
 
-/** The provisioning engine CDK Terrain shells out to. */
+/** The provisioning engine CDK Terrain shells out to (also the binary name). */
 export enum Engine {
-  /** OpenTofu (`tofu` binary) — the default. */
+  /** OpenTofu (`tofu` binary). */
   OpenTofu = 'tofu',
   /** HashiCorp Terraform (`terraform` binary). */
   Terraform = 'terraform',
 }
+
+/** Auto-detect: prefer OpenTofu, fall back to Terraform based on what's on PATH. */
+export const ENGINE_AUTO = 'auto'
+
+/** The `engine` input: a concrete engine, or `auto` to detect from PATH. */
+export type EnginePreference = Engine | typeof ENGINE_AUTO
 
 /** The npm CLI package the action runs via npx. */
 export interface CliSelection {
@@ -40,7 +46,8 @@ export interface ActionInputs {
   cdktnVersion: string
   /** Deprecated: version of the legacy `cdktf-cli` to run instead. */
   cdktfVersion: string
-  engine: Engine
+  /** Engine preference: `tofu`, `terraform`, or `auto` (detect from PATH). */
+  engine: EnginePreference
   /** Optional exact engine version to require on PATH (empty = only check presence). */
   engineVersion: string
   workingDirectory: string

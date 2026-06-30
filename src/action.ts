@@ -5,9 +5,9 @@ import * as core from '@actions/core'
 import * as exec from '@actions/exec'
 import * as github from '@actions/github'
 import { buildCommentBody, CommentController, type RepoContext } from './comment.js'
-import { ensureBinary } from './ensure-binary.js'
+import { resolveEngine } from './ensure-binary.js'
 import { getInputs } from './inputs.js'
-import { type ActionInputs, type CliSelection, ExecutionMode } from './models.js'
+import { type ActionInputs, type CliSelection, type Engine, ExecutionMode } from './models.js'
 
 /** Split a raw CLI-args string into argv tokens (whitespace separated). */
 function splitArgs(raw: string): string[] {
@@ -79,7 +79,10 @@ function repoContext(): RepoContext {
 export async function run(): Promise<void> {
   const inputs = getInputs()
 
-  await ensureBinary(inputs.engine, inputs.engineVersion)
+  // Resolve `auto` to a concrete engine (and verify the binary is present) so
+  // everything downstream — env, comment, marker — uses the real engine.
+  const engine: Engine = await resolveEngine(inputs.engine, inputs.engineVersion)
+  inputs.engine = engine
 
   if (inputs.cloudToken) {
     core.setSecret(inputs.cloudToken)

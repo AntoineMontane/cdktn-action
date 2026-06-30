@@ -6,8 +6,9 @@
 
 A GitHub Action that runs [CDK Terrain (CDKTN)](https://cdktn.io) — the
 community-maintained CDK for Terraform fork — as part of your CI/CD workflow.
-Synthesize, plan, apply or destroy a stack with **OpenTofu by default** (or
-Terraform), and optionally report the result back on the pull request.
+Synthesize, plan, apply or destroy a stack with **OpenTofu by default**
+(auto-detected from `PATH`, or Terraform), and optionally report the result back
+on the pull request.
 
 This is an independent, clean-room reimplementation inspired by HashiCorp's
 archived [`terraform-cdk-action`](https://github.com/hashicorp/terraform-cdk-action).
@@ -17,9 +18,10 @@ See [`NOTICE`](./NOTICE).
 
 This action **does not install the engine**; it verifies the binary is on `PATH`.
 Run [`opentofu/setup-opentofu`](https://github.com/opentofu/setup-opentofu) (or
-[`hashicorp/setup-terraform`](https://github.com/hashicorp/setup-terraform) for
-`engine: terraform`) first. The CDK Terrain CLI (`cdktn-cli`) is fetched on
-demand via `npx`.
+[`hashicorp/setup-terraform`](https://github.com/hashicorp/setup-terraform))
+first. By default (`engine: auto`) the action detects whichever binary is on
+`PATH`, preferring OpenTofu; set `engine: tofu`/`terraform` to force one. The
+CDK Terrain CLI (`cdktn-cli`) is fetched on demand via `npx`.
 
 > [!IMPORTANT]
 > Disable the setup action's command wrapper (`tofu_wrapper: false` /
@@ -79,7 +81,7 @@ jobs:
 | `mode`             | yes      | —       | `synth-only`, `plan-only`, `auto-approve-apply`, or `auto-approve-destroy`. |
 | `cdktnVersion`     | yes¹     | —       | Version of `cdktn-cli` to run (fetched via `npx`). |
 | `stackName`        | for non-synth modes | — | Stack to operate on. Required for every mode except `synth-only`. |
-| `engine`           | no       | `tofu`  | Engine to drive: `tofu` (OpenTofu) or `terraform`. Sets `TERRAFORM_BINARY_NAME`. |
+| `engine`           | no       | `auto`  | Engine to drive: `auto` (detect, prefer OpenTofu), `tofu`, or `terraform`. Sets `TERRAFORM_BINARY_NAME`. |
 | `engineVersion`    | no       | —       | Exact engine version that must be on `PATH`. Empty = only check presence. |
 | `workingDirectory` | no       | `./`    | Directory the CDK Terrain project lives in. |
 | `cloudToken`       | no       | —       | HCP Terraform / TFE token (exported as `TF_TOKEN_app_terraform_io`). |
@@ -123,8 +125,11 @@ The toolchain is pinned with [mise](https://mise.jdx.dev) and the bundle is
 produced by [Rolldown](https://rolldown.rs); linting/formatting use
 [Biome](https://biomejs.dev) and tests use [Vitest](https://vitest.dev).
 
+The Node version is pinned in [`.nvmrc`](./.nvmrc) (mise reads it via
+`idiomatic_version_file_enable_tools`), so `setup-node`/`nvm`/`mise` all agree.
+
 ```bash
-mise install     # node 24, actionlint, zizmor
+mise install     # node (from .nvmrc), actionlint, zizmor
 npm ci
 npm run all      # biome check + typecheck + test + bundle dist/
 ```
