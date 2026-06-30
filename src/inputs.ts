@@ -1,38 +1,68 @@
 // SPDX-License-Identifier: Apache-2.0
-// Copyright The cdk-terrain-action Contributors
+// Copyright The CDK Terrain Contributors
 
 import * as core from '@actions/core'
-import { type ActionInputs, ExecutionMode, modeRequiresStack } from './models.js'
+import { type ActionInputs, Engine, ExecutionMode, modeRequiresStack } from './models.js'
 
-function parseMode(raw: string): ExecutionMode {
-  const valid = Object.values(ExecutionMode) as string[]
-  if (!valid.includes(raw)) {
-    throw new Error(`Invalid mode "${raw}". Expected one of: ${valid.join(', ')}.`)
+/**
+ * Read a canonical input, falling back to a deprecated alias for migration ease.
+ * Warns when the deprecated alias is what supplied the value.
+ */
+function withDeprecated(canonical: string, deprecated: string): string {
+  const value = core.getInput(canonical)
+  if (value) return value
+  const legacy = core.getInput(deprecated)
+  if (legacy) {
+    core.warning(`Input "${deprecated}" is deprecated; use "${canonical}" instead.`)
   }
-  return raw as ExecutionMode
+  return legacy
+}
+
+function parseEnum<T extends Record<string, string>>(
+  raw: string,
+  enumObj: T,
+  label: string,
+): T[keyof T] {
+  const valid = Object.values(enumObj)
+  if (!valid.includes(raw)) {
+    throw new Error(`Invalid ${label} "${raw}". Expected one of: ${valid.join(', ')}.`)
+  }
+  return raw as T[keyof T]
 }
 
 /** Read and validate all action inputs from the environment via @actions/core. */
 export function getInputs(): ActionInputs {
-  const mode = parseMode(core.getInput('mode', { required: true }))
+  const mode = parseEnum(core.getInput('mode', { required: true }), ExecutionMode, 'mode')
   const stackName = core.getInput('stackName')
-
   if (modeRequiresStack(mode) && !stackName) {
     throw new Error(`The "stackName" input is required when mode is "${mode}".`)
   }
 
+  const cdktnVersion = core.getInput('cdktnVersion')
+  const cdktfVersion = core.getInput('cdktfVersion')
+  if (!cdktnVersion && !cdktfVersion) {
+    throw new Error('Provide a "cdktnVersion" (or the deprecated "cdktfVersion") input.')
+  }
+  if (cdktnVersion && cdktfVersion) {
+    core.warning('Both "cdktnVersion" and "cdktfVersion" were set; using "cdktnVersion".')
+  } else if (cdktfVersion) {
+    core.warning('Input "cdktfVersion" is deprecated; migrate to "cdktnVersion".')
+  }
+
   return {
-    cdktfVersion: core.getInput('cdktfVersion') || '0.21.0',
-    terraformVersion: core.getInput('terraformVersion') || '1.13.3',
+    cdktnVersion,
+    cdktfVersion,
+    engine: parseEnum(core.getInput('engine') || Engine.OpenTofu, Engine, 'engine'),
+    engineVersion: withDeprecated('engineVersion', 'terraformVersion'),
     workingDirectory: core.getInput('workingDirectory') || './',
     mode,
     stackName,
-    terraformCloudToken: core.getInput('terraformCloudToken'),
+    cloudToken: withDeprecated('cloudToken', 'terraformCloudToken'),
     githubToken: core.getInput('githubToken'),
     commentOnPr: core.getBooleanInput('commentOnPr'),
     updateComment: core.getBooleanInput('updateComment'),
     customNpxArgs: core.getInput('customNpxArgs'),
-    cdktfArgs: core.getInput('cdktfArgs'),
+    cdktnArgs: withDeprecated('cdktnArgs', 'cdktfArgs'),
     suppressOutput: core.getBooleanInput('suppressOutput'),
   }
 }

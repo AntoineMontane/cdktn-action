@@ -9,21 +9,23 @@ import {
   extractRunUrl,
   hasNoChanges,
 } from '../src/comment.js'
-import { type ActionInputs, ExecutionMode } from '../src/models.js'
+import { type ActionInputs, Engine, ExecutionMode } from '../src/models.js'
 
 function inputs(overrides: Partial<ActionInputs> = {}): ActionInputs {
   return {
-    cdktfVersion: '0.21.0',
-    terraformVersion: '1.13.3',
+    cdktnVersion: '0.23.3',
+    cdktfVersion: '',
+    engine: Engine.OpenTofu,
+    engineVersion: '',
     workingDirectory: './',
     mode: ExecutionMode.PlanOnly,
     stackName: 'my-stack',
-    terraformCloudToken: '',
+    cloudToken: '',
     githubToken: 'token',
     commentOnPr: true,
     updateComment: true,
     customNpxArgs: '',
-    cdktfArgs: '',
+    cdktnArgs: '',
     suppressOutput: false,
     ...overrides,
   }
@@ -39,7 +41,7 @@ describe('commentMarker', () => {
   })
 
   it('is wrapped as an HTML comment', () => {
-    expect(commentMarker(inputs())).toMatch(/^<!-- cdk-terrain-action:[0-9a-f]{16} -->$/)
+    expect(commentMarker(inputs())).toMatch(/^<!-- cdktn-action:[0-9a-f]{16} -->$/)
   })
 })
 

@@ -1,5 +1,5 @@
-cdk-terrain-action
-Copyright The cdk-terrain-action Contributors
+CDK Terrain Action (cdktn-io/action)
+Copyright The CDK Terrain Contributors
 
 This product is licensed under the Apache License, Version 2.0 (see LICENSE).
 
@@ -10,10 +10,13 @@ Prior art / acknowledgements
 This action is an independent, clean-room reimplementation inspired by the
 behaviour of HashiCorp's "terraform-cdk-action"
 (https://github.com/hashicorp/terraform-cdk-action), which is distributed under
-the Mozilla Public License 2.0. No source code from that project was copied into
-this repository; the implementation here was written from a behavioural
-description of the original action. We gratefully acknowledge that prior work.
+the Mozilla Public License 2.0 and was archived on 2025-12-10. No source code
+from that project was copied into this repository; the implementation here was
+written from a behavioural description of the original action. We gratefully
+acknowledge that prior work.
 
-This action invokes the CDK for Terraform CLI (cdktf-cli) and the Terraform CLI,
-which are separate programs distributed by HashiCorp under their own licenses and
-are not bundled with or redistributed by this project.
+This action runs CDK Terrain's "cdktn-cli" (or, for migration, the legacy
+"cdktf-cli") and drives a provisioning engine — OpenTofu ("tofu") by default, or
+HashiCorp Terraform ("terraform"). Those CLIs and engines are separate programs
+distributed under their own licenses and are not bundled with or redistributed
+by this project.

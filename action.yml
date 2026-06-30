@@ -1,24 +1,35 @@
-name: cdk-terrain-action
-description: Run CDK for Terraform (CDKTF) — synth, plan, apply or destroy — as part of your CI/CD workflow.
-author: Open Constructs
+name: CDK Terrain
+description: Run CDK Terrain (CDKTN) — synth, plan, apply or destroy — with OpenTofu (default) or Terraform.
+author: CDK Terrain
 
 branding:
   icon: terminal
   color: purple
 
 inputs:
+  cdktnVersion:
+    description: Version of cdktn-cli to run (fetched on demand via npx). Required unless cdktfVersion is set.
+    required: false
   cdktfVersion:
-    description: Version of the cdktf-cli to run (fetched on demand via npx).
+    description: "Deprecated: version of the legacy cdktf-cli to run instead of cdktn-cli. Prefer cdktnVersion."
     required: false
-    default: 0.21.0
-  terraformVersion:
+  engine:
+    description: Provisioning engine to drive — `tofu` (OpenTofu, default) or `terraform`.
+    required: false
+    default: tofu
+  engineVersion:
     description: >-
-      Terraform version that must already be on PATH. This action verifies the
-      version but does not install it; use hashicorp/setup-terraform first.
+      Exact engine version that must already be on PATH. The action verifies but
+      does not install it; use opentofu/setup-opentofu or hashicorp/setup-terraform
+      first. Leave empty to only check the binary is present.
     required: false
-    default: 1.13.3
+    default: ""
+  terraformVersion:
+    description: "Deprecated alias for engineVersion."
+    required: false
+    default: ""
   workingDirectory:
-    description: Directory the CDKTF project lives in.
+    description: Directory the CDK Terrain project lives in.
     required: false
     default: ./
   mode:
@@ -30,11 +41,14 @@ inputs:
   stackName:
     description: Stack to operate on. Required for every mode except `synth-only`.
     required: false
-  terraformCloudToken:
+  cloudToken:
     description: HCP Terraform / Terraform Enterprise API token (exported as TF_TOKEN_app_terraform_io).
     required: false
+  terraformCloudToken:
+    description: "Deprecated alias for cloudToken."
+    required: false
   githubToken:
-    description: Token used to post the result as a pull request comment. No comment is posted if omitted.
+    description: Token used to post the run result as a pull request comment. No comment is posted if omitted.
     required: false
   commentOnPr:
     description: Whether to post the run result as a comment on the associated pull request.
@@ -45,23 +59,27 @@ inputs:
     required: false
     default: "true"
   customNpxArgs:
-    description: Extra CLI arguments passed to `npx` before the cdktf-cli package.
+    description: Extra CLI arguments passed to `npx` before the CLI package.
+    required: false
+    default: ""
+  cdktnArgs:
+    description: Extra CLI arguments passed to the `cdktn` command.
     required: false
     default: ""
   cdktfArgs:
-    description: Extra CLI arguments passed to the `cdktf` command.
+    description: "Deprecated alias for cdktnArgs."
     required: false
     default: ""
   suppressOutput:
-    description: Omit the captured CDKTF output from the pull request comment.
+    description: Omit the captured CLI output from the pull request comment.
     required: false
     default: "false"
 
 outputs:
   exitCode:
-    description: Exit code returned by the cdktf-cli invocation.
+    description: Exit code returned by the CLI invocation.
   output:
-    description: Combined stdout/stderr captured from the cdktf-cli invocation.
+    description: Combined stdout/stderr captured from the CLI invocation.
 
 runs:
   using: node24

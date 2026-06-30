@@ -36052,7 +36052,7 @@ function getOctokit(token, options, ...additionalPlugins) {
 //#region src/comment.ts
 /** GitHub comment bodies are capped at 65536 chars; leave headroom for chrome. */
 const MAX_COMMENT_LENGTH = 65e3;
-const MARKER_PREFIX = "cdk-terrain-action";
+const MARKER_PREFIX = "cdktn-action";
 /**
 * A stable, hidden marker identifying the comment for this exact configuration,
 * so repeated runs can update the same comment instead of stacking new ones.
@@ -36062,11 +36062,11 @@ function commentMarker(inputs) {
 		inputs.mode,
 		inputs.stackName,
 		inputs.workingDirectory,
-		inputs.cdktfVersion,
-		inputs.terraformVersion
+		inputs.engine,
+		inputs.cdktnVersion || inputs.cdktfVersion
 	].join("\0")).digest("hex").slice(0, 16)} -->`;
 }
-/** Heuristic: CDKTF/Terraform reports "No changes" when the plan is empty. */
+/** Heuristic: the engine reports "No changes" when the plan is empty. */
 function hasNoChanges(output) {
 	return /no changes\b/i.test(output);
 }
@@ -36092,10 +36092,11 @@ function buildCommentBody(inputs, output, success) {
 	const header = [
 		marker,
 		"",
-		`### ${icon} CDKTF \`${inputs.mode}\``,
+		`### ${icon} CDK Terrain \`${inputs.mode}\``,
 		""
 	];
 	if (inputs.stackName) header.push(`**Stack:** \`${inputs.stackName}\``, "");
+	header.push(`**Engine:** \`${inputs.engine}\``, "");
 	if (runUrl) header.push(`[View run in HCP Terraform](${runUrl})`, "");
 	if (inputs.suppressOutput) return header.join("\n").trimEnd();
 	const wrapperOpen = [
@@ -36175,9 +36176,9 @@ var CommentController = class {
 };
 //#endregion
 //#region src/models.ts
-/** The operation the action performs against a CDKTF project. */
+/** The operation the action performs against a CDK Terrain project. */
 let ExecutionMode = /* @__PURE__ */ function(ExecutionMode) {
-	/** Synthesize Terraform configuration only. */
+	/** Synthesize the configuration only. */
 	ExecutionMode["SynthOnly"] = "synth-only";
 	/** Plan a single stack. */
 	ExecutionMode["PlanOnly"] = "plan-only";
@@ -36191,62 +36192,95 @@ let ExecutionMode = /* @__PURE__ */ function(ExecutionMode) {
 function modeRequiresStack(mode) {
 	return mode !== "synth-only";
 }
+/** The provisioning engine CDK Terrain shells out to. */
+let Engine = /* @__PURE__ */ function(Engine) {
+	/** OpenTofu (`tofu` binary) — the default. */
+	Engine["OpenTofu"] = "tofu";
+	/** HashiCorp Terraform (`terraform` binary). */
+	Engine["Terraform"] = "terraform";
+	return Engine;
+}({});
 //#endregion
-//#region src/inputs.ts
-function parseMode(raw) {
-	const valid = Object.values(ExecutionMode);
-	if (!valid.includes(raw)) throw new Error(`Invalid mode "${raw}". Expected one of: ${valid.join(", ")}.`);
-	return raw;
+//#region src/ensure-binary.ts
+/** Which GitHub Action installs each engine, surfaced in error messages. */
+const SETUP_ACTION = {
+	["tofu"]: "opentofu/setup-opentofu",
+	["terraform"]: "hashicorp/setup-terraform"
+};
+/** Parse a semantic version (e.g. "OpenTofu v1.12.3" or "Terraform v1.13.3"). */
+function parseVersion(output) {
+	return output.match(/\bv?(\d+\.\d+\.\d+)/)?.[1];
 }
-/** Read and validate all action inputs from the environment via @actions/core. */
-function getInputs() {
-	const mode = parseMode(getInput("mode", { required: true }));
-	const stackName = getInput("stackName");
-	if (modeRequiresStack(mode) && !stackName) throw new Error(`The "stackName" input is required when mode is "${mode}".`);
-	return {
-		cdktfVersion: getInput("cdktfVersion") || "0.21.0",
-		terraformVersion: getInput("terraformVersion") || "1.13.3",
-		workingDirectory: getInput("workingDirectory") || "./",
-		mode,
-		stackName,
-		terraformCloudToken: getInput("terraformCloudToken"),
-		githubToken: getInput("githubToken"),
-		commentOnPr: getBooleanInput("commentOnPr"),
-		updateComment: getBooleanInput("updateComment"),
-		customNpxArgs: getInput("customNpxArgs"),
-		cdktfArgs: getInput("cdktfArgs"),
-		suppressOutput: getBooleanInput("suppressOutput")
-	};
-}
-//#endregion
-//#region src/setup-terraform.ts
 /**
-* Verify that the expected Terraform version is already available on PATH.
+* Verify that the selected engine's binary (`tofu` or `terraform`) is on PATH.
 *
-* This action deliberately does not install Terraform; CDKTF shells out to the
-* `terraform` binary, so callers are expected to run `hashicorp/setup-terraform`
-* (or equivalent) beforehand. We fail fast with an actionable message when the
-* binary is missing or the version does not match.
+* The action never installs the engine — CDK Terrain shells out to it — so the
+* caller must run the matching setup action first. When `expectedVersion` is
+* given we additionally require an exact match; otherwise we only confirm the
+* binary is present (and log the version we found).
 */
-async function ensureTerraform(expectedVersion) {
+async function ensureBinary(engine, expectedVersion) {
+	const binary = engine;
 	let result;
 	try {
-		result = await import_exec.getExecOutput("terraform", ["version", "-json"], {
+		result = await import_exec.getExecOutput(binary, ["version"], {
 			silent: true,
 			ignoreReturnCode: true
 		});
 	} catch (error) {
 		const message = error instanceof Error ? error.message : String(error);
-		throw new Error(`Terraform was not found on PATH (${message}). Install it before this step, e.g. with "hashicorp/setup-terraform" pinned to ${expectedVersion}.`);
+		throw new Error(`"${binary}" was not found on PATH (${message}). Install it before this step with "${SETUP_ACTION[engine]}".`);
 	}
-	if (result.exitCode !== 0) throw new Error(`Unable to determine the Terraform version (exit code ${result.exitCode}). Install Terraform ${expectedVersion} before this step, e.g. with "hashicorp/setup-terraform".`);
-	let installedVersion;
-	try {
-		installedVersion = JSON.parse(result.stdout).terraform_version;
-	} catch {
-		throw new Error("Could not parse the output of \"terraform version -json\".");
-	}
-	if (installedVersion !== expectedVersion) throw new Error(`Expected Terraform ${expectedVersion} but found ${installedVersion}. Pin "hashicorp/setup-terraform" (or your installer) to ${expectedVersion}.`);
+	if (result.exitCode !== 0) throw new Error(`Unable to run "${binary} version" (exit code ${result.exitCode}). Install ${binary} before this step with "${SETUP_ACTION[engine]}".`);
+	const installed = parseVersion(result.stdout);
+	if (!installed) throw new Error(`Could not determine the ${binary} version from: ${result.stdout.trim()}`);
+	if (expectedVersion && installed !== expectedVersion) throw new Error(`Expected ${binary} ${expectedVersion} but found ${installed}. Pin "${SETUP_ACTION[engine]}" to ${expectedVersion}.`);
+	info(`Using ${binary} ${installed}.`);
+}
+//#endregion
+//#region src/inputs.ts
+/**
+* Read a canonical input, falling back to a deprecated alias for migration ease.
+* Warns when the deprecated alias is what supplied the value.
+*/
+function withDeprecated(canonical, deprecated) {
+	const value = getInput(canonical);
+	if (value) return value;
+	const legacy = getInput(deprecated);
+	if (legacy) warning(`Input "${deprecated}" is deprecated; use "${canonical}" instead.`);
+	return legacy;
+}
+function parseEnum(raw, enumObj, label) {
+	const valid = Object.values(enumObj);
+	if (!valid.includes(raw)) throw new Error(`Invalid ${label} "${raw}". Expected one of: ${valid.join(", ")}.`);
+	return raw;
+}
+/** Read and validate all action inputs from the environment via @actions/core. */
+function getInputs() {
+	const mode = parseEnum(getInput("mode", { required: true }), ExecutionMode, "mode");
+	const stackName = getInput("stackName");
+	if (modeRequiresStack(mode) && !stackName) throw new Error(`The "stackName" input is required when mode is "${mode}".`);
+	const cdktnVersion = getInput("cdktnVersion");
+	const cdktfVersion = getInput("cdktfVersion");
+	if (!cdktnVersion && !cdktfVersion) throw new Error("Provide a \"cdktnVersion\" (or the deprecated \"cdktfVersion\") input.");
+	if (cdktnVersion && cdktfVersion) warning("Both \"cdktnVersion\" and \"cdktfVersion\" were set; using \"cdktnVersion\".");
+	else if (cdktfVersion) warning("Input \"cdktfVersion\" is deprecated; migrate to \"cdktnVersion\".");
+	return {
+		cdktnVersion,
+		cdktfVersion,
+		engine: parseEnum(getInput("engine") || "tofu", Engine, "engine"),
+		engineVersion: withDeprecated("engineVersion", "terraformVersion"),
+		workingDirectory: getInput("workingDirectory") || "./",
+		mode,
+		stackName,
+		cloudToken: withDeprecated("cloudToken", "terraformCloudToken"),
+		githubToken: getInput("githubToken"),
+		commentOnPr: getBooleanInput("commentOnPr"),
+		updateComment: getBooleanInput("updateComment"),
+		customNpxArgs: getInput("customNpxArgs"),
+		cdktnArgs: withDeprecated("cdktnArgs", "cdktfArgs"),
+		suppressOutput: getBooleanInput("suppressOutput")
+	};
 }
 //#endregion
 //#region src/action.ts
@@ -36254,8 +36288,22 @@ async function ensureTerraform(expectedVersion) {
 function splitArgs(raw) {
 	return raw.split(/\s+/).filter((token) => token.length > 0);
 }
-/** Map an execution mode to the cdktf-cli sub-command and its arguments. */
-function cdktfCommand(inputs) {
+/**
+* Pick the CLI package to run. `cdktnVersion` runs CDK Terrain's `cdktn-cli`;
+* the deprecated `cdktfVersion` runs the legacy `cdktf-cli` for migration ease.
+*/
+function resolveCli(inputs) {
+	if (inputs.cdktnVersion) return {
+		pkg: "cdktn-cli",
+		version: inputs.cdktnVersion
+	};
+	return {
+		pkg: "cdktf-cli",
+		version: inputs.cdktfVersion
+	};
+}
+/** Map an execution mode to the CLI sub-command and its arguments. */
+function engineCommand(inputs) {
 	switch (inputs.mode) {
 		case "synth-only": return ["synth"];
 		case "plan-only": return ["plan", inputs.stackName];
@@ -36271,21 +36319,23 @@ function cdktfCommand(inputs) {
 		];
 	}
 }
-/** Assemble the full `npx` argv that runs the pinned cdktf-cli. */
+/** Assemble the full `npx` argv that runs the selected CDK CLI. */
 function buildNpxArgs(inputs) {
+	const cli = resolveCli(inputs);
 	const args = ["--yes"];
 	args.push(...splitArgs(inputs.customNpxArgs));
-	args.push(`cdktf-cli@${inputs.cdktfVersion}`);
-	args.push(...cdktfCommand(inputs));
-	args.push(...splitArgs(inputs.cdktfArgs));
+	args.push(`${cli.pkg}@${cli.version}`);
+	args.push(...engineCommand(inputs));
+	args.push(...splitArgs(inputs.cdktnArgs));
 	return args;
 }
 function buildEnv(inputs) {
 	const env = {};
 	for (const [key, value] of Object.entries(process.env)) if (value !== void 0) env[key] = value;
+	env.TERRAFORM_BINARY_NAME = inputs.engine;
 	env.FORCE_COLOR = "0";
 	env.TF_CLI_ARGS = "-no-color";
-	if (inputs.terraformCloudToken) env.TF_TOKEN_app_terraform_io = inputs.terraformCloudToken;
+	if (inputs.cloudToken) env.TF_TOKEN_app_terraform_io = inputs.cloudToken;
 	return env;
 }
 function repoContext() {
@@ -36299,10 +36349,10 @@ function repoContext() {
 }
 async function run() {
 	const inputs = getInputs();
-	await ensureTerraform(inputs.terraformVersion);
+	await ensureBinary(inputs.engine, inputs.engineVersion);
+	if (inputs.cloudToken) setSecret(inputs.cloudToken);
 	const args = buildNpxArgs(inputs);
-	info(`Running: npx ${args.join(" ")}`);
-	if (inputs.terraformCloudToken) setSecret(inputs.terraformCloudToken);
+	info(`Running: npx ${args.join(" ")} (engine: ${inputs.engine})`);
 	const result = await import_exec.getExecOutput("npx", args, {
 		cwd: inputs.workingDirectory,
 		env: buildEnv(inputs),
@@ -36314,7 +36364,7 @@ async function run() {
 	setOutput("output", output);
 	if (inputs.commentOnPr) if (inputs.githubToken) await new CommentController(getOctokit(inputs.githubToken), repoContext()).upsert(inputs, buildCommentBody(inputs, output, success));
 	else warning("commentOnPr is enabled but no githubToken was provided; skipping comment.");
-	if (!success) setFailed(`cdktf ${cdktfCommand(inputs).join(" ")} failed with exit code ${result.exitCode}.`);
+	if (!success) setFailed(`${engineCommand(inputs).join(" ")} failed with exit code ${result.exitCode}.`);
 }
 //#endregion
 //#region src/index.ts

@@ -1,21 +1,23 @@
 {
-  "name": "cdk-terrain-action",
-  "description": "GitHub Action to run CDK for Terraform (CDKTF) as part of your CI/CD workflow",
+  "name": "cdktn-action",
+  "description": "GitHub Action to run CDK Terrain (CDKTN) with OpenTofu or Terraform in your CI/CD workflow",
   "version": "0.0.0",
-  "author": "Open Constructs",
+  "author": "CDK Terrain",
   "type": "module",
   "private": true,
-  "homepage": "https://github.com/open-constructs/cdk-terrain-action",
+  "homepage": "https://github.com/cdktn-io/action",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/open-constructs/cdk-terrain-action.git"
+    "url": "git+https://github.com/cdktn-io/action.git"
   },
   "bugs": {
-    "url": "https://github.com/open-constructs/cdk-terrain-action/issues"
+    "url": "https://github.com/cdktn-io/action/issues"
   },
   "keywords": [
     "actions",
+    "cdktn",
     "cdktf",
+    "opentofu",
     "terraform",
     "cdk"
   ],

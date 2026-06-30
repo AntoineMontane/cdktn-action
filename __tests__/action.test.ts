@@ -1,61 +1,84 @@
 // SPDX-License-Identifier: Apache-2.0
-// Copyright The cdk-terrain-action Contributors
+// Copyright The CDK Terrain Contributors
 
 import { describe, expect, it } from 'vitest'
-import { buildNpxArgs } from '../src/action.js'
-import { type ActionInputs, ExecutionMode } from '../src/models.js'
+import { buildNpxArgs, resolveCli } from '../src/action.js'
+import { type ActionInputs, Engine, ExecutionMode } from '../src/models.js'
 
 function inputs(overrides: Partial<ActionInputs> = {}): ActionInputs {
   return {
-    cdktfVersion: '0.21.0',
-    terraformVersion: '1.13.3',
+    cdktnVersion: '0.23.3',
+    cdktfVersion: '',
+    engine: Engine.OpenTofu,
+    engineVersion: '',
     workingDirectory: './',
     mode: ExecutionMode.SynthOnly,
     stackName: '',
-    terraformCloudToken: '',
+    cloudToken: '',
     githubToken: '',
     commentOnPr: false,
     updateComment: false,
     customNpxArgs: '',
-    cdktfArgs: '',
+    cdktnArgs: '',
     suppressOutput: false,
     ...overrides,
   }
 }
 
+describe('resolveCli', () => {
+  it('runs cdktn-cli for cdktnVersion', () => {
+    expect(resolveCli(inputs())).toEqual({ pkg: 'cdktn-cli', version: '0.23.3' })
+  })
+
+  it('runs the legacy cdktf-cli for cdktfVersion', () => {
+    const cli = resolveCli(inputs({ cdktnVersion: '', cdktfVersion: '0.21.0' }))
+    expect(cli).toEqual({ pkg: 'cdktf-cli', version: '0.21.0' })
+  })
+
+  it('prefers cdktnVersion when both are set', () => {
+    const cli = resolveCli(inputs({ cdktnVersion: '0.23.3', cdktfVersion: '0.21.0' }))
+    expect(cli.pkg).toBe('cdktn-cli')
+  })
+})
+
 describe('buildNpxArgs', () => {
   it('builds a synth command', () => {
-    expect(buildNpxArgs(inputs())).toEqual(['--yes', 'cdktf-cli@0.21.0', 'synth'])
+    expect(buildNpxArgs(inputs())).toEqual(['--yes', 'cdktn-cli@0.23.3', 'synth'])
   })
 
   it('builds a plan command for a stack', () => {
     const args = buildNpxArgs(inputs({ mode: ExecutionMode.PlanOnly, stackName: 'dev' }))
-    expect(args).toEqual(['--yes', 'cdktf-cli@0.21.0', 'plan', 'dev'])
+    expect(args).toEqual(['--yes', 'cdktn-cli@0.23.3', 'plan', 'dev'])
   })
 
   it('builds an auto-approved apply', () => {
     const args = buildNpxArgs(inputs({ mode: ExecutionMode.AutoApproveApply, stackName: 'dev' }))
-    expect(args).toEqual(['--yes', 'cdktf-cli@0.21.0', 'apply', 'dev', '--auto-approve'])
+    expect(args).toEqual(['--yes', 'cdktn-cli@0.23.3', 'apply', 'dev', '--auto-approve'])
   })
 
   it('builds an auto-approved destroy', () => {
     const args = buildNpxArgs(inputs({ mode: ExecutionMode.AutoApproveDestroy, stackName: 'dev' }))
-    expect(args).toEqual(['--yes', 'cdktf-cli@0.21.0', 'destroy', 'dev', '--auto-approve'])
+    expect(args).toEqual(['--yes', 'cdktn-cli@0.23.3', 'destroy', 'dev', '--auto-approve'])
   })
 
-  it('threads custom npx and cdktf args', () => {
+  it('uses the legacy package for cdktfVersion', () => {
+    const args = buildNpxArgs(inputs({ cdktnVersion: '', cdktfVersion: '0.21.0' }))
+    expect(args).toEqual(['--yes', 'cdktf-cli@0.21.0', 'synth'])
+  })
+
+  it('threads custom npx and cdktn args', () => {
     const args = buildNpxArgs(
       inputs({
         mode: ExecutionMode.PlanOnly,
         stackName: 'dev',
         customNpxArgs: '--prefer-offline',
-        cdktfArgs: '--var foo=bar',
+        cdktnArgs: '--var foo=bar',
       }),
     )
     expect(args).toEqual([
       '--yes',
       '--prefer-offline',
-      'cdktf-cli@0.21.0',
+      'cdktn-cli@0.23.3',
       'plan',
       'dev',
       '--var',

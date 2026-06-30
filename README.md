@@ -1,12 +1,13 @@
-# cdk-terrain-action
+# CDK Terrain Action
 
-[![CI](https://github.com/open-constructs/cdk-terrain-action/actions/workflows/ci.yml/badge.svg)](https://github.com/open-constructs/cdk-terrain-action/actions/workflows/ci.yml)
-[![Security](https://github.com/open-constructs/cdk-terrain-action/actions/workflows/security.yml/badge.svg)](https://github.com/open-constructs/cdk-terrain-action/actions/workflows/security.yml)
+[![CI](https://github.com/cdktn-io/action/actions/workflows/ci.yml/badge.svg)](https://github.com/cdktn-io/action/actions/workflows/ci.yml)
+[![Security](https://github.com/cdktn-io/action/actions/workflows/security.yml/badge.svg)](https://github.com/cdktn-io/action/actions/workflows/security.yml)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](./LICENSE)
 
-A GitHub Action that runs [CDK for Terraform (CDKTF)](https://developer.hashicorp.com/terraform/cdktf)
-as part of your CI/CD workflow — synthesize, plan, apply, or destroy a stack and
-(optionally) report the result back on the pull request.
+A GitHub Action that runs [CDK Terrain (CDKTN)](https://cdktn.io) — the
+community-maintained CDK for Terraform fork — as part of your CI/CD workflow.
+Synthesize, plan, apply or destroy a stack with **OpenTofu by default** (or
+Terraform), and optionally report the result back on the pull request.
 
 This is an independent, clean-room reimplementation inspired by HashiCorp's
 archived [`terraform-cdk-action`](https://github.com/hashicorp/terraform-cdk-action).
@@ -14,10 +15,17 @@ See [`NOTICE`](./NOTICE).
 
 ## Usage
 
-This action **does not install Terraform**; it verifies that the requested
-version is already on `PATH`. Run
-[`hashicorp/setup-terraform`](https://github.com/hashicorp/setup-terraform)
-first. The CDKTF CLI is fetched on demand via `npx`.
+This action **does not install the engine**; it verifies the binary is on `PATH`.
+Run [`opentofu/setup-opentofu`](https://github.com/opentofu/setup-opentofu) (or
+[`hashicorp/setup-terraform`](https://github.com/hashicorp/setup-terraform) for
+`engine: terraform`) first. The CDK Terrain CLI (`cdktn-cli`) is fetched on
+demand via `npx`.
+
+> [!IMPORTANT]
+> Disable the setup action's command wrapper (`tofu_wrapper: false` /
+> `terraform_wrapper: false`) so CDK Terrain can call the binary directly.
+
+### OpenTofu (default)
 
 ```yaml
 jobs:
@@ -33,53 +41,81 @@ jobs:
         with:
           node-version: 24
 
+      - uses: opentofu/setup-opentofu@v2
+        with:
+          tofu_version: 1.12.3
+          tofu_wrapper: false
+
+      - uses: cdktn-io/action@v1
+        with:
+          mode: plan-only
+          stackName: my-stack
+          cdktnVersion: 0.23.3
+          engineVersion: 1.12.3 # optional: require this exact tofu version
+          githubToken: ${{ github.token }}
+```
+
+### Terraform
+
+```yaml
       - uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: 1.13.3
           terraform_wrapper: false
 
-      - uses: open-constructs/cdk-terrain-action@v1
+      - uses: cdktn-io/action@v1
         with:
           mode: plan-only
           stackName: my-stack
-          terraformVersion: 1.13.3
-          cdktfVersion: 0.21.0
-          terraformCloudToken: ${{ secrets.TF_API_TOKEN }}
-          githubToken: ${{ github.token }}
+          cdktnVersion: 0.23.3
+          engine: terraform
+          cloudToken: ${{ secrets.TF_API_TOKEN }}
 ```
 
 ## Inputs
 
-| Input                 | Required | Default    | Description |
-| --------------------- | -------- | ---------- | ----------- |
-| `mode`                | yes      | —          | `synth-only`, `plan-only`, `auto-approve-apply`, or `auto-approve-destroy`. |
-| `stackName`           | for non-synth modes | — | Stack to operate on. Required for every mode except `synth-only`. |
-| `cdktfVersion`        | no       | `0.21.0`   | Version of `cdktf-cli` to run (fetched via `npx`). |
-| `terraformVersion`    | no       | `1.13.3`   | Terraform version that must already be on `PATH`. |
-| `workingDirectory`    | no       | `./`       | Directory the CDKTF project lives in. |
-| `terraformCloudToken` | no       | —          | HCP Terraform / TFE token (exported as `TF_TOKEN_app_terraform_io`). |
-| `githubToken`         | no       | —          | Token used to post the PR comment. No comment is posted if omitted. |
-| `commentOnPr`         | no       | `true`     | Post the run result as a PR comment. |
-| `updateComment`       | no       | `true`     | Update the previous comment for this config instead of adding a new one. |
-| `customNpxArgs`       | no       | `""`       | Extra args passed to `npx` before the cdktf-cli package. |
-| `cdktfArgs`           | no       | `""`       | Extra args passed to the `cdktf` command. |
-| `suppressOutput`      | no       | `false`    | Omit captured CDKTF output from the PR comment. |
+| Input              | Required | Default | Description |
+| ------------------ | -------- | ------- | ----------- |
+| `mode`             | yes      | —       | `synth-only`, `plan-only`, `auto-approve-apply`, or `auto-approve-destroy`. |
+| `cdktnVersion`     | yes¹     | —       | Version of `cdktn-cli` to run (fetched via `npx`). |
+| `stackName`        | for non-synth modes | — | Stack to operate on. Required for every mode except `synth-only`. |
+| `engine`           | no       | `tofu`  | Engine to drive: `tofu` (OpenTofu) or `terraform`. Sets `TERRAFORM_BINARY_NAME`. |
+| `engineVersion`    | no       | —       | Exact engine version that must be on `PATH`. Empty = only check presence. |
+| `workingDirectory` | no       | `./`    | Directory the CDK Terrain project lives in. |
+| `cloudToken`       | no       | —       | HCP Terraform / TFE token (exported as `TF_TOKEN_app_terraform_io`). |
+| `githubToken`      | no       | —       | Token used to post the PR comment. No comment is posted if omitted. |
+| `commentOnPr`      | no       | `true`  | Post the run result as a PR comment. |
+| `updateComment`    | no       | `true`  | Update the previous comment for this config instead of adding a new one. |
+| `customNpxArgs`    | no       | `""`    | Extra args passed to `npx` before the CLI package. |
+| `cdktnArgs`        | no       | `""`    | Extra args passed to the `cdktn` command. |
+| `suppressOutput`   | no       | `false` | Omit captured CLI output from the PR comment. |
+
+¹ Provide either `cdktnVersion` or the deprecated `cdktfVersion`; the action errors if both are missing.
+
+### Deprecated inputs (accepted for migration)
+
+| Deprecated            | Use instead    | Notes |
+| --------------------- | -------------- | ----- |
+| `cdktfVersion`        | `cdktnVersion` | Runs the legacy `cdktf-cli` package instead of `cdktn-cli`, easing migration from `hashicorp/terraform-cdk-action`. |
+| `terraformVersion`    | `engineVersion`| — |
+| `terraformCloudToken` | `cloudToken`   | — |
+| `cdktfArgs`           | `cdktnArgs`    | — |
 
 ## Outputs
 
 | Output     | Description |
 | ---------- | ----------- |
-| `exitCode` | Exit code returned by the cdktf-cli invocation. |
-| `output`   | Combined stdout/stderr captured from the cdktf-cli invocation. |
+| `exitCode` | Exit code returned by the CLI invocation. |
+| `output`   | Combined stdout/stderr captured from the CLI invocation. |
 
 ## Modes
 
-| Mode                   | cdktf command                       |
-| ---------------------- | ----------------------------------- |
-| `synth-only`           | `synth`                             |
-| `plan-only`            | `plan <stackName>`                  |
-| `auto-approve-apply`   | `apply <stackName> --auto-approve`  |
-| `auto-approve-destroy` | `destroy <stackName> --auto-approve`|
+| Mode                   | command                              |
+| ---------------------- | ------------------------------------ |
+| `synth-only`           | `synth`                              |
+| `plan-only`            | `plan <stackName>`                   |
+| `auto-approve-apply`   | `apply <stackName> --auto-approve`   |
+| `auto-approve-destroy` | `destroy <stackName> --auto-approve` |
 
 ## Development
 
@@ -107,7 +143,7 @@ action directly at any tag. The [`check-dist`](.github/workflows/check-dist.yml)
 workflow rebuilds it on every change and fails if the committed bundle drifts
 from source, so a tag always runs code that is reproducible from its reviewed
 source. Releases additionally attach
-[build provenance](https://github.com/open-constructs/cdk-terrain-action/attestations).
+[build provenance](https://github.com/cdktn-io/action/attestations).
 
 ## License
 
