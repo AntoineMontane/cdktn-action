@@ -134,6 +134,12 @@ npm ci
 npm run all      # biome check + typecheck + test + bundle dist/
 ```
 
+> [!NOTE]
+> When changing dependencies, regenerate the lockfile with `npm run relock`
+> (clean install). A plain incremental `npm install` on macOS drops Linux-only
+> optional binaries (`@rolldown/binding-linux-*`, `@emnapi/*`, …) from
+> `package-lock.json`, which makes `npm ci` fail on the Linux CI runner.
+
 Workflows are linted with `actionlint` and security-scanned with `zizmor`:
 
 ```bash
