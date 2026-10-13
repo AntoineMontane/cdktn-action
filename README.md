@@ -52,7 +52,7 @@ jobs:
         with:
           mode: plan-only
           stackName: my-stack
-          cdktnVersion: 0.23.3
+          cdktnVersion: 0.24.0
           engineVersion: 1.12.3 # optional: require this exact tofu version
           githubToken: ${{ github.token }}
 ```
@@ -69,7 +69,7 @@ jobs:
         with:
           mode: plan-only
           stackName: my-stack
-          cdktnVersion: 0.23.3
+          cdktnVersion: 0.24.0
           engine: terraform
           cloudToken: ${{ secrets.TF_API_TOKEN }}
 ```
