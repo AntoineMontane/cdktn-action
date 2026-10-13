@@ -41,3 +41,47 @@ jobs:
 
       - name: Bundle dist/
         run: npm run package
+
+  # Runs the committed dist/ end to end against a real project. The fixture is
+  # the unmodified output of `cdktn init --template typescript-pnpm`.
+  smoke:
+    name: Smoke test (synth-only)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - name: Set up toolchain (node)
+        uses: jdx/mise-action@e6a8b3978addb5a52f2b4cd9d91eafa7f0ab959d # v4.2.0
+
+      - name: Set up OpenTofu
+        uses: opentofu/setup-opentofu@a1320f892987e89d278cc92dc5adc984fb93aca4 # v2.0.2
+        with:
+          tofu_wrapper: false
+
+      - name: Install fixture dependencies
+        working-directory: __fixtures__/smoke
+        run: |
+          corepack enable
+          pnpm install --frozen-lockfile
+
+      - name: Run the action
+        id: synth
+        uses: ./ # zizmor: ignore[self-repository]
+        with:
+          mode: synth-only
+          # Keep in step with the cdktn version in __fixtures__/smoke/package.json.
+          cdktnVersion: 0.25.0-pre.54
+          workingDirectory: __fixtures__/smoke
+          commentOnPr: 'false'
+
+      - name: Verify the synthesized stack
+        env:
+          EXIT_CODE: ${{ steps.synth.outputs.exitCode }}
+        run: |
+          test "$EXIT_CODE" = "0"
+          test -s __fixtures__/smoke/cdktf.out/stacks/smoke/cdk.tf.json

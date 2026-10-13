@@ -1,0 +1,6 @@
+allowBuilds:
+  esbuild: true
+  unrs-resolver: true
+  "@parcel/watcher": false
+minimumReleaseAgeExclude:
+  - cdktn@0.25.0-pre.54

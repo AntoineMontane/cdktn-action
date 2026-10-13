@@ -1,0 +1,17 @@
+{
+  "language": "typescript",
+  "app": "pnpm exec tsx main.ts",
+  "projectId": "c6fa6cda-86aa-449b-ac11-32ebee60022d",
+  "sendCrashReports": "false",
+  "targetVersions": {
+    "terraform": ">=1.5.7",
+    "opentofu": ">=1.6.0"
+  },
+  "sendUsageTelemetry": "false",
+  "terraformProviders": [],
+  "terraformModules": [],
+  "context": {
+    "failOnConstructsOutsideOfStacks": "true",
+    "canonicalAssetHashes": "true"
+  }
+}
