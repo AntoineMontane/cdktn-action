@@ -1,0 +1,42 @@
+{
+  "compilerOptions": {
+    "alwaysStrict": true,
+    "declaration": true,
+    "experimentalDecorators": true,
+    "inlineSourceMap": true,
+    "inlineSources": true,
+    // Required for ts-jest on TypeScript 6; `npm run build` still type-checks.
+    "isolatedModules": true,
+    "lib": [
+      "es2018"
+    ],
+    "module": "CommonJS",
+    "noEmitOnError": true,
+    "noFallthroughCasesInSwitch": true,
+    "noImplicitAny": true,
+    "noImplicitReturns": true,
+    "noImplicitThis": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "resolveJsonModule": true,
+    "strict": true,
+    "strictNullChecks": true,
+    "strictPropertyInitialization": true,
+    "stripInternal": true,
+    "target": "ES2018",
+    // TypeScript 6 no longer picks up ambient @types automatically.
+    "types": [
+      "node",
+      "jest"
+    ],
+    "incremental": true,
+    "skipLibCheck": true
+  },
+  "include": [
+    "**/*.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "cdktf.out"
+  ]
+}
