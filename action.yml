@@ -89,6 +89,10 @@ outputs:
     description: Exit code returned by the CLI invocation.
   output:
     description: Combined stdout/stderr captured from the CLI invocation.
+  outputs:
+    description: >-
+      Stack output values as a JSON string (`auto-approve-apply` only), from
+      `cdktn apply --outputs-file`. Sensitive outputs are not included.
 
 runs:
   using: node24

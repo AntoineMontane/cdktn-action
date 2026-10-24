@@ -10,6 +10,10 @@ import { createHash } from "node:crypto";
 import { StringDecoder } from "string_decoder";
 import * as child from "child_process";
 import { setTimeout as setTimeout$1 } from "timers";
+import { existsSync as existsSync$1 } from "node:fs";
+import { readFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 //#region \0rolldown/runtime.js
 var __create = Object.create;
 var __defProp = Object.defineProperty;
@@ -21049,15 +21053,19 @@ function resolveCli(inputs) {
 		version: inputs.cdktfVersion
 	};
 }
-/** Map an execution mode to the CLI sub-command and its arguments. */
-function engineCommand(inputs) {
+/**
+* Map an execution mode to the CLI sub-command and its arguments. An apply
+* writes the stack outputs to `outputsFile` when one is given.
+*/
+function engineCommand(inputs, outputsFile) {
 	switch (inputs.mode) {
 		case "synth-only": return ["synth"];
 		case "plan-only": return ["plan", inputs.stackName];
 		case "auto-approve-apply": return [
 			"apply",
 			inputs.stackName,
-			"--auto-approve"
+			"--auto-approve",
+			...outputsFile ? ["--outputs-file", outputsFile] : []
 		];
 		case "auto-approve-destroy": return [
 			"destroy",
@@ -21067,7 +21075,7 @@ function engineCommand(inputs) {
 	}
 }
 /** Assemble the full `npx` argv that runs the selected CDK CLI. */
-function buildNpxArgs(inputs) {
+function buildNpxArgs(inputs, outputsFile) {
 	const args = [inputs.useLocalCli ? "--no" : "--yes"];
 	args.push(...splitArgs(inputs.customNpxArgs));
 	if (inputs.useLocalCli) args.push("cdktn");
@@ -21075,9 +21083,18 @@ function buildNpxArgs(inputs) {
 		const cli = resolveCli(inputs);
 		args.push(`${cli.pkg}@${cli.version}`);
 	}
-	args.push(...engineCommand(inputs));
+	args.push(...engineCommand(inputs, outputsFile));
 	args.push(...splitArgs(inputs.cdktnArgs));
 	return args;
+}
+/** Where an apply writes the stack outputs (outside the project directory). */
+function outputsFilePath() {
+	return join(process.env.RUNNER_TEMP || tmpdir(), `cdktn-outputs-${process.pid}.json`);
+}
+/** Read the outputs file an apply wrote, as a JSON string (`{}` if absent). */
+async function readStackOutputs(outputsFile) {
+	if (!existsSync$1(outputsFile)) return "{}";
+	return JSON.stringify(JSON.parse(await readFile(outputsFile, "utf8")));
 }
 function buildEnv(inputs) {
 	const env = {};
@@ -21101,7 +21118,8 @@ async function run() {
 	const inputs = getInputs();
 	inputs.engine = await resolveEngine(inputs.engine, inputs.engineVersion);
 	if (inputs.cloudToken) setSecret(inputs.cloudToken);
-	const args = buildNpxArgs(inputs);
+	const outputsFile = inputs.mode === "auto-approve-apply" ? outputsFilePath() : void 0;
+	const args = buildNpxArgs(inputs, outputsFile);
 	info(`Running: npx ${args.join(" ")} (engine: ${inputs.engine})`);
 	const result = await getExecOutput("npx", args, {
 		cwd: inputs.workingDirectory,
@@ -21112,6 +21130,7 @@ async function run() {
 	const success = result.exitCode === 0;
 	setOutput("exitCode", result.exitCode);
 	setOutput("output", output);
+	if (outputsFile && success) setOutput("outputs", await readStackOutputs(outputsFile));
 	if (inputs.commentOnPr) {
 		if (inputs.githubToken) await new CommentController(getOctokit(inputs.githubToken), repoContext()).upsert(inputs, buildCommentBody(inputs, output, success));
 		else warning("commentOnPr is enabled but no githubToken was provided; skipping comment.");

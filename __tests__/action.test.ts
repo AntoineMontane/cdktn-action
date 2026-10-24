@@ -1,8 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright The CDK Terrain Contributors
 
+import { mkdtempSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { buildNpxArgs, resolveCli } from '../src/action.js'
+import { buildNpxArgs, readStackOutputs, resolveCli } from '../src/action.js'
 import { type ActionInputs, Engine, ExecutionMode } from '../src/models.js'
 
 function inputs(overrides: Partial<ActionInputs> = {}): ActionInputs {
@@ -107,5 +110,41 @@ describe('buildNpxArgs', () => {
   it('threads custom npx args before the local CLI', () => {
     const args = buildNpxArgs(inputs({ useLocalCli: true, customNpxArgs: '--quiet' }))
     expect(args).toEqual(['--no', '--quiet', 'cdktn', 'synth'])
+  })
+
+  it('writes the stack outputs of an apply to a file', () => {
+    const args = buildNpxArgs(
+      inputs({ mode: ExecutionMode.AutoApproveApply, stackName: 'dev' }),
+      '/tmp/outputs.json',
+    )
+    expect(args).toEqual([
+      '--yes',
+      'cdktn-cli@0.23.3',
+      'apply',
+      'dev',
+      '--auto-approve',
+      '--outputs-file',
+      '/tmp/outputs.json',
+    ])
+  })
+
+  it('only passes the outputs file to apply', () => {
+    const args = buildNpxArgs(
+      inputs({ mode: ExecutionMode.PlanOnly, stackName: 'dev' }),
+      '/tmp/outputs.json',
+    )
+    expect(args).toEqual(['--yes', 'cdktn-cli@0.23.3', 'plan', 'dev'])
+  })
+})
+
+describe('readStackOutputs', () => {
+  it('returns the outputs file as compact JSON', async () => {
+    const file = join(mkdtempSync(join(tmpdir(), 'cdktn-action-')), 'outputs.json')
+    writeFileSync(file, JSON.stringify({ dev: { url: 'https://example.com' } }, null, 2))
+    expect(await readStackOutputs(file)).toBe('{"dev":{"url":"https://example.com"}}')
+  })
+
+  it('returns an empty object when no outputs file was written', async () => {
+    expect(await readStackOutputs(join(tmpdir(), 'cdktn-action-missing.json'))).toBe('{}')
   })
 })
