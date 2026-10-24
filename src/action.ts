@@ -41,10 +41,16 @@ function engineCommand(inputs: ActionInputs): string[] {
 
 /** Assemble the full `npx` argv that runs the selected CDK CLI. */
 export function buildNpxArgs(inputs: ActionInputs): string[] {
-  const cli = resolveCli(inputs)
-  const args = ['--yes']
+  // The project-local cdktn comes from node_modules (`--no`: never download
+  // one); otherwise fetch the requested CLI version on demand.
+  const args = [inputs.useLocalCli ? '--no' : '--yes']
   args.push(...splitArgs(inputs.customNpxArgs))
-  args.push(`${cli.pkg}@${cli.version}`)
+  if (inputs.useLocalCli) {
+    args.push('cdktn')
+  } else {
+    const cli = resolveCli(inputs)
+    args.push(`${cli.pkg}@${cli.version}`)
+  }
   args.push(...engineCommand(inputs))
   args.push(...splitArgs(inputs.cdktnArgs))
   return args
