@@ -30,8 +30,8 @@ export function resolveCli(inputs: ActionInputs): CliSelection {
 }
 
 /**
- * Map an execution mode to the CLI sub-command and its arguments; only apply
- * uses `outputsFile`, which every other mode ignores.
+ * Map an execution mode to the CLI sub-command and its arguments. Only apply
+ * uses `outputsFile`.
  */
 function engineCommand(inputs: ActionInputs, outputsFile?: string): string[] {
   switch (inputs.mode) {

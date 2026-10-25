@@ -21051,8 +21051,8 @@ function resolveCli(inputs) {
 	};
 }
 /**
-* Map an execution mode to the CLI sub-command and its arguments; only apply
-* uses `outputsFile`, which every other mode ignores.
+* Map an execution mode to the CLI sub-command and its arguments. Only apply
+* uses `outputsFile`.
 */
 function engineCommand(inputs, outputsFile) {
 	switch (inputs.mode) {
