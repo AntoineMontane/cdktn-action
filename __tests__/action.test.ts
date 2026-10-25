@@ -1,12 +1,17 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright The CDK Terrain Contributors
 
-import { mkdtempSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { describe, expect, it } from 'vitest'
-import { buildNpxArgs, readStackOutputs, resolveCli } from '../src/action.js'
+import * as core from '@actions/core'
+import * as exec from '@actions/exec'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { buildNpxArgs, readStackOutputs, resolveCli, run } from '../src/action.js'
 import { type ActionInputs, Engine, ExecutionMode } from '../src/models.js'
+
+vi.mock('@actions/core')
+vi.mock('@actions/exec')
 
 function inputs(overrides: Partial<ActionInputs> = {}): ActionInputs {
   return {
@@ -123,5 +128,66 @@ describe('readStackOutputs', () => {
 
   it('returns an empty object when no outputs file was written', async () => {
     expect(await readStackOutputs(join(tmpdir(), 'cdktn-action-missing.json'))).toBe('{}')
+  })
+})
+
+describe('run', () => {
+  let runnerTemp: string
+
+  beforeEach(() => {
+    vi.resetAllMocks()
+    runnerTemp = mkdtempSync(join(tmpdir(), 'cdktn-action-'))
+    vi.stubEnv('RUNNER_TEMP', runnerTemp)
+  })
+
+  afterEach(() => {
+    vi.unstubAllEnvs()
+    rmSync(runnerTemp, { recursive: true, force: true })
+  })
+
+  /** Run the action with these raw inputs against a fake `tofu` and a fake CLI exiting `exitCode`. */
+  async function runAction(mode: ExecutionMode, exitCode: number): Promise<void> {
+    const raw: Record<string, string> = {
+      mode,
+      stackName: 'dev',
+      cdktnVersion: '0.24.0',
+      engine: Engine.OpenTofu,
+      commentOnPr: 'false',
+    }
+    vi.mocked(core.getInput).mockImplementation((name) => raw[name] ?? '')
+    vi.mocked(core.getBooleanInput).mockImplementation((name) => raw[name] === 'true')
+    vi.mocked(exec.getExecOutput).mockImplementation(async (cmd, args = []) => {
+      if (cmd === Engine.OpenTofu) return { exitCode: 0, stdout: 'OpenTofu v1.12.3', stderr: '' }
+      // Like the real CLI, write pretty-printed outputs wherever --outputs-file points.
+      const flag = args.indexOf('--outputs-file')
+      if (flag !== -1) {
+        writeFileSync(
+          args[flag + 1],
+          JSON.stringify({ dev: { url: 'https://example.com' } }, null, 2),
+        )
+      }
+      return { exitCode, stdout: '', stderr: '' }
+    })
+    await run()
+  }
+
+  function outputNames(): string[] {
+    return vi.mocked(core.setOutput).mock.calls.map(([name]) => name)
+  }
+
+  it('sets the stack outputs as compact JSON after a successful apply', async () => {
+    await runAction(ExecutionMode.AutoApproveApply, 0)
+    expect(core.setOutput).toHaveBeenCalledWith('outputs', '{"dev":{"url":"https://example.com"}}')
+  })
+
+  it('does not set the stack outputs when the apply fails', async () => {
+    await runAction(ExecutionMode.AutoApproveApply, 1)
+    expect(outputNames()).toEqual(['exitCode', 'output'])
+    expect(core.setFailed).toHaveBeenCalled()
+  })
+
+  it('does not set the stack outputs for a plan', async () => {
+    await runAction(ExecutionMode.PlanOnly, 0)
+    expect(outputNames()).toEqual(['exitCode', 'output'])
   })
 })
