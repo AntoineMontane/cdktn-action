@@ -109,9 +109,9 @@ jobs:
 | ---------- | ----------- |
 | `exitCode` | Exit code returned by the CLI invocation. |
 | `output`   | Combined stdout/stderr captured from the CLI invocation. |
-| `outputs`  | Stack output values as a JSON string, set after a successful `auto-approve-apply` (from `cdktn apply --outputs-file`; sensitive outputs are not included). |
+| `outputs`  | Stack output values as a JSON string keyed by stack name (from `cdktn apply --outputs-file`). Set only after a successful `auto-approve-apply`. Sensitive outputs are excluded. |
 
-For example, to use a stack output as the deployment URL:
+For example, to use a stack output as the deployment URL (the `|| '{}'` covers runs where `outputs` is not set):
 
 ```yaml
 jobs:

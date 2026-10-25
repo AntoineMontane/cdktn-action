@@ -94,7 +94,7 @@ describe('buildNpxArgs', () => {
     ])
   })
 
-  it('writes the stack outputs of an apply to a file', () => {
+  it('passes the outputs file to an apply', () => {
     const args = buildNpxArgs(
       inputs({ mode: ExecutionMode.AutoApproveApply, stackName: 'dev' }),
       '/tmp/outputs.json',
@@ -145,7 +145,7 @@ describe('run', () => {
     rmSync(runnerTemp, { recursive: true, force: true })
   })
 
-  /** Run the action with these raw inputs against a fake `tofu` and a fake CLI exiting `exitCode`. */
+  /** Drive run() in `mode` against a fake `tofu` and a fake CLI that exits with `exitCode`. */
   async function runAction(mode: ExecutionMode, exitCode: number): Promise<void> {
     const raw: Record<string, string> = {
       mode,

@@ -21051,8 +21051,8 @@ function resolveCli(inputs) {
 	};
 }
 /**
-* Map an execution mode to the CLI sub-command and its arguments. An apply
-* writes the stack outputs to `outputsFile` when one is given.
+* Map an execution mode to the CLI sub-command and its arguments; only apply
+* uses `outputsFile`, which every other mode ignores.
 */
 function engineCommand(inputs, outputsFile) {
 	switch (inputs.mode) {
@@ -21081,11 +21081,14 @@ function buildNpxArgs(inputs, outputsFile) {
 	args.push(...splitArgs(inputs.cdktnArgs));
 	return args;
 }
-/** Where an apply writes the stack outputs (outside the project directory). */
+/**
+* Outputs file for this step: under RUNNER_TEMP so it stays out of the
+* project tree, and keyed by pid so several steps in one job don't collide.
+*/
 function outputsFilePath() {
 	return join(process.env.RUNNER_TEMP || tmpdir(), `cdktn-outputs-${process.pid}.json`);
 }
-/** Read the outputs file an apply wrote, as a JSON string (`{}` if absent). */
+/** Return the outputs file as compact JSON, or `{}` when the file is absent; throws on invalid JSON. */
 async function readStackOutputs(outputsFile) {
 	if (!existsSync$1(outputsFile)) return "{}";
 	return JSON.stringify(JSON.parse(await readFile(outputsFile, "utf8")));

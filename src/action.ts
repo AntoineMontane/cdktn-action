@@ -30,8 +30,8 @@ export function resolveCli(inputs: ActionInputs): CliSelection {
 }
 
 /**
- * Map an execution mode to the CLI sub-command and its arguments. An apply
- * writes the stack outputs to `outputsFile` when one is given.
+ * Map an execution mode to the CLI sub-command and its arguments; only apply
+ * uses `outputsFile`, which every other mode ignores.
  */
 function engineCommand(inputs: ActionInputs, outputsFile?: string): string[] {
   switch (inputs.mode) {
@@ -44,6 +44,9 @@ function engineCommand(inputs: ActionInputs, outputsFile?: string): string[] {
         'apply',
         inputs.stackName,
         '--auto-approve',
+        // Supported by cdktn-cli (0.24.0) and legacy cdktf-cli (0.21.0) alike;
+        // sensitive outputs are left out unless
+        // --outputs-file-include-sensitive-outputs is also passed.
         ...(outputsFile ? ['--outputs-file', outputsFile] : []),
       ]
     case ExecutionMode.AutoApproveDestroy:
@@ -62,12 +65,15 @@ export function buildNpxArgs(inputs: ActionInputs, outputsFile?: string): string
   return args
 }
 
-/** Where an apply writes the stack outputs (outside the project directory). */
+/**
+ * Outputs file for this step: under RUNNER_TEMP so it stays out of the
+ * project tree, and keyed by pid so several steps in one job don't collide.
+ */
 function outputsFilePath(): string {
   return join(process.env.RUNNER_TEMP || tmpdir(), `cdktn-outputs-${process.pid}.json`)
 }
 
-/** Read the outputs file an apply wrote, as a JSON string (`{}` if absent). */
+/** Return the outputs file as compact JSON, or `{}` when the file is absent; throws on invalid JSON. */
 export async function readStackOutputs(outputsFile: string): Promise<string> {
   if (!existsSync(outputsFile)) return '{}'
   return JSON.stringify(JSON.parse(await readFile(outputsFile, 'utf8')))
@@ -126,6 +132,7 @@ export async function run(): Promise<void> {
 
   core.setOutput('exitCode', result.exitCode)
   core.setOutput('output', output)
+  // Publish outputs only for a successful apply, so later steps never act on a failed deploy.
   if (outputsFile && success) {
     core.setOutput('outputs', await readStackOutputs(outputsFile))
   }
