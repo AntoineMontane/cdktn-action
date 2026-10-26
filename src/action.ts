@@ -1,6 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright The CDK Terrain Contributors
 
+import { existsSync } from 'node:fs'
+import { readFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import * as core from '@actions/core'
 import * as exec from '@actions/exec'
 import * as github from '@actions/github'
@@ -25,29 +29,54 @@ export function resolveCli(inputs: ActionInputs): CliSelection {
   return { pkg: 'cdktf-cli', version: inputs.cdktfVersion }
 }
 
-/** Map an execution mode to the CLI sub-command and its arguments. */
-function engineCommand(inputs: ActionInputs): string[] {
+/**
+ * Map an execution mode to the CLI sub-command and its arguments. Only apply
+ * uses `outputsFile`.
+ */
+function engineCommand(inputs: ActionInputs, outputsFile?: string): string[] {
   switch (inputs.mode) {
     case ExecutionMode.SynthOnly:
       return ['synth']
     case ExecutionMode.PlanOnly:
       return ['plan', inputs.stackName]
     case ExecutionMode.AutoApproveApply:
-      return ['apply', inputs.stackName, '--auto-approve']
+      return [
+        'apply',
+        inputs.stackName,
+        '--auto-approve',
+        // Supported by cdktn-cli (0.24.0) and legacy cdktf-cli (0.21.0) alike;
+        // sensitive outputs are left out unless
+        // --outputs-file-include-sensitive-outputs is also passed.
+        ...(outputsFile ? ['--outputs-file', outputsFile] : []),
+      ]
     case ExecutionMode.AutoApproveDestroy:
       return ['destroy', inputs.stackName, '--auto-approve']
   }
 }
 
 /** Assemble the full `npx` argv that runs the selected CDK CLI. */
-export function buildNpxArgs(inputs: ActionInputs): string[] {
+export function buildNpxArgs(inputs: ActionInputs, outputsFile?: string): string[] {
   const cli = resolveCli(inputs)
   const args = ['--yes']
   args.push(...splitArgs(inputs.customNpxArgs))
   args.push(`${cli.pkg}@${cli.version}`)
-  args.push(...engineCommand(inputs))
+  args.push(...engineCommand(inputs, outputsFile))
   args.push(...splitArgs(inputs.cdktnArgs))
   return args
+}
+
+/**
+ * Outputs file for this step: under RUNNER_TEMP so it stays out of the
+ * project tree, and keyed by pid so several steps in one job don't collide.
+ */
+function outputsFilePath(): string {
+  return join(process.env.RUNNER_TEMP || tmpdir(), `cdktn-outputs-${process.pid}.json`)
+}
+
+/** Return the outputs file as compact JSON, or `{}` when the file is absent; throws on invalid JSON. */
+async function readStackOutputs(outputsFile: string): Promise<string> {
+  if (!existsSync(outputsFile)) return '{}'
+  return JSON.stringify(JSON.parse(await readFile(outputsFile, 'utf8')))
 }
 
 function buildEnv(inputs: ActionInputs): { [key: string]: string } {
@@ -88,7 +117,8 @@ export async function run(): Promise<void> {
     core.setSecret(inputs.cloudToken)
   }
 
-  const args = buildNpxArgs(inputs)
+  const outputsFile = inputs.mode === ExecutionMode.AutoApproveApply ? outputsFilePath() : undefined
+  const args = buildNpxArgs(inputs, outputsFile)
   core.info(`Running: npx ${args.join(' ')} (engine: ${inputs.engine})`)
 
   const result = await exec.getExecOutput('npx', args, {
@@ -102,6 +132,10 @@ export async function run(): Promise<void> {
 
   core.setOutput('exitCode', result.exitCode)
   core.setOutput('output', output)
+  // Publish outputs only for a successful apply, so later steps never act on a failed deploy.
+  if (outputsFile && success) {
+    core.setOutput('stackOutputs', await readStackOutputs(outputsFile))
+  }
 
   if (inputs.commentOnPr) {
     if (inputs.githubToken) {
