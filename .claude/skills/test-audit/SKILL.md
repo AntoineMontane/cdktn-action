@@ -101,7 +101,7 @@ matches one, and audits hunt for existing tests that do.
   snapshot entries under two titles;
 - per-tier replays of a contract that one owner already proves: an argv that
   a `buildNpxArgs` test pins, asserted again through `run()`;
-- tests whose only purpose is preserving test-only exports, context keys,
+- tests whose only purpose is preserving test-only exports, inputs,
   environment variables, or injection parameters;
 - helpers defined in the test file and then tested there;
 - dead production code whose only callers are tests;
@@ -203,12 +203,12 @@ Choose one coherent owner-boundary batch, reviewable in under 30 minutes. Keep
 it apart from feature and fix PRs; a bug fix does not carry surrounding test
 cleanup.
 
-Delete obsolete test-only exports, context keys, wrappers, and dead production
+Delete obsolete test-only exports, inputs, wrappers, and dead production
 paths instead of preserving aliases. Removing or renaming an `action.yml`
 input or output, or a deprecated alias, is a breaking change for workflows
 that use the action and is not audit cleanup; report it as a follow-up. Move
-retained regressions to their canonical owners. Delete the snapshot entries and fixtures a removed
-test leaves behind.
+retained regressions to their canonical owners. Delete the snapshot entries
+and fixtures a removed test leaves behind.
 
 Prefer net-negative production LOC. Do not add replacement tests that restate
 the same implementation, and do not convert uncertain candidates into cleanup
@@ -237,9 +237,10 @@ Commands for every step are in [TIERS.md](TIERS.md).
 
 Commit, push, open a PR, or land only when authorized. Title a pure test change
 `test:`, and use `refactor:` when production seams are removed with it; add
-a scope (`test(comment):`) only when it helps. Never label away the tier the change touches. Land one
-coherent PR at a time; after landing, refresh from current `main` and rerun
-read-only discovery for the next high-confidence batch.
+a scope (`test(comment):`) only when it helps. Never skip or disable the
+CI job for the tier the change touches. Land one coherent PR at a time; after
+landing, refresh from current `main` and rerun read-only discovery for the
+next high-confidence batch.
 
 ## Handoff
 

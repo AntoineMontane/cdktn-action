@@ -27,11 +27,11 @@ workflows or scripts change; check it against `.github/workflows/` and
 - The smoke job runs the `dist/` committed on the PR head, so a PR whose
   `dist/` was not rebuilt smoke-tests the old code.
 - The smoke job covers `synth-only` with OpenTofu and checks only `exitCode`
-  and the synthesized file. Plan, apply, destroy, Terraform, the `outputs`
-  output, and PR comments have no end-to-end coverage; their only proof is
-  the unit tier.
+  and the synthesized file. Plan, apply, destroy, Terraform, the
+  `stackOutputs` output, and PR comments have no end-to-end coverage; their
+  only proof is the unit tier.
 - Vitest's `include` is `__tests__/**/*.test.ts`. A test file anywhere else,
-  including the fixture's own `jest` script, never runs.
+  including the smoke fixture's own `jest` scaffold, never runs.
 
 ## Commands
 
@@ -55,9 +55,9 @@ npm run all              # check + typecheck + test + package
 
 The smoke test has no local script; CI is its runner. The nearest local check
 is `npm run local-action` with a `.env` copied from `.env.example` and
-`INPUT_WORKINGDIRECTORY=__fixtures__/smoke` (after `pnpm install` there, with
-OpenTofu on PATH). It runs `src/index.ts`, not the committed `dist/`, so it
-does not prove the bundle.
+`INPUT_WORKINGDIRECTORY=__fixtures__/smoke`, after `pnpm install` in the
+fixture (a pnpm project, unlike this repo) and with OpenTofu on PATH. It runs
+`src/index.ts`, not the committed `dist/`, so it does not prove the bundle.
 
 Workflow lint (installed by `mise install`):
 

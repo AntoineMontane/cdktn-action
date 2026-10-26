@@ -11,6 +11,10 @@ This skill is adapted from the `test-audit` skill in
   notice, copied from that commit. It covers the portions of this directory
   taken from OpenClaw.
 
-Adapted to this repository: its test tiers and CI routing, snapshot
-rules, contracts worth retaining, and validation commands replace the
-openclaw-specific ones.
+Adapted to this repository: taken via the adapted copy in the
+[cdk-terrain](https://github.com/open-constructs/cdk-terrain) monorepo, then
+rewritten for this action. `SKILL.md` and `CAMPAIGN.md` keep openclaw's
+method and value bar; this repo's test tiers and CI routing, contracts worth
+retaining, campaign lanes, and npm, Vitest, and Biome commands replace the
+openclaw- and monorepo-specific ones. `TIERS.md` comes from cdk-terrain,
+not openclaw, and is rewritten for this repo.
