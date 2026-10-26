@@ -7,7 +7,7 @@ import { join } from 'node:path'
 import * as core from '@actions/core'
 import * as exec from '@actions/exec'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { buildNpxArgs, readStackOutputs, resolveCli, run } from '../src/action.js'
+import { buildNpxArgs, resolveCli, run } from '../src/action.js'
 import { type ActionInputs, Engine, ExecutionMode } from '../src/models.js'
 
 vi.mock('@actions/core')
@@ -119,18 +119,6 @@ describe('buildNpxArgs', () => {
   })
 })
 
-describe('readStackOutputs', () => {
-  it('returns the outputs file as compact JSON', async () => {
-    const file = join(mkdtempSync(join(tmpdir(), 'cdktn-action-')), 'outputs.json')
-    writeFileSync(file, JSON.stringify({ dev: { url: 'https://example.com' } }, null, 2))
-    expect(await readStackOutputs(file)).toBe('{"dev":{"url":"https://example.com"}}')
-  })
-
-  it('returns an empty object when no outputs file was written', async () => {
-    expect(await readStackOutputs(join(tmpdir(), 'cdktn-action-missing.json'))).toBe('{}')
-  })
-})
-
 describe('run', () => {
   let runnerTemp: string
 
@@ -145,8 +133,15 @@ describe('run', () => {
     rmSync(runnerTemp, { recursive: true, force: true })
   })
 
-  /** Drive run() in `mode` against a fake `tofu` and a fake CLI that exits with `exitCode`. */
-  async function runAction(mode: ExecutionMode, exitCode: number): Promise<void> {
+  /**
+   * Drive run() in `mode` against a fake `tofu` and a fake CLI that exits with
+   * `exitCode` and, unless `writesOutputs` is false, writes the outputs file.
+   */
+  async function runAction(
+    mode: ExecutionMode,
+    exitCode: number,
+    writesOutputs = true,
+  ): Promise<void> {
     const raw: Record<string, string> = {
       mode,
       stackName: 'dev',
@@ -160,7 +155,7 @@ describe('run', () => {
       if (cmd === Engine.OpenTofu) return { exitCode: 0, stdout: 'OpenTofu v1.12.3', stderr: '' }
       // Like the real CLI, write pretty-printed outputs wherever --outputs-file points.
       const flag = args.indexOf('--outputs-file')
-      if (flag !== -1) {
+      if (flag !== -1 && writesOutputs) {
         writeFileSync(
           args[flag + 1],
           JSON.stringify({ dev: { url: 'https://example.com' } }, null, 2),
@@ -181,6 +176,11 @@ describe('run', () => {
       'stackOutputs',
       '{"dev":{"url":"https://example.com"}}',
     )
+  })
+
+  it('sets the stack outputs to {} when a successful apply writes no outputs file', async () => {
+    await runAction(ExecutionMode.AutoApproveApply, 0, false)
+    expect(core.setOutput).toHaveBeenCalledWith('stackOutputs', '{}')
   })
 
   it('does not set the stack outputs when the apply fails', async () => {

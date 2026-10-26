@@ -74,7 +74,7 @@ function outputsFilePath(): string {
 }
 
 /** Return the outputs file as compact JSON, or `{}` when the file is absent; throws on invalid JSON. */
-export async function readStackOutputs(outputsFile: string): Promise<string> {
+async function readStackOutputs(outputsFile: string): Promise<string> {
   if (!existsSync(outputsFile)) return '{}'
   return JSON.stringify(JSON.parse(await readFile(outputsFile, 'utf8')))
 }
