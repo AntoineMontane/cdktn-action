@@ -134,7 +134,7 @@ export async function run(): Promise<void> {
   core.setOutput('output', output)
   // Publish outputs only for a successful apply, so later steps never act on a failed deploy.
   if (outputsFile && success) {
-    core.setOutput('outputs', await readStackOutputs(outputsFile))
+    core.setOutput('stackOutputs', await readStackOutputs(outputsFile))
   }
 
   if (inputs.commentOnPr) {

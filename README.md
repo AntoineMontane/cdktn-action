@@ -105,20 +105,20 @@ jobs:
 
 ## Outputs
 
-| Output     | Description |
-| ---------- | ----------- |
-| `exitCode` | Exit code returned by the CLI invocation. |
-| `output`   | Combined stdout/stderr captured from the CLI invocation. |
-| `outputs`  | Stack output values as a JSON string keyed by stack name (from `cdktn apply --outputs-file`). Set only after a successful `auto-approve-apply`. Sensitive outputs are excluded. |
+| Output         | Description |
+| -------------- | ----------- |
+| `exitCode`     | Exit code returned by the CLI invocation. |
+| `output`       | Combined stdout/stderr captured from the CLI invocation. |
+| `stackOutputs` | Stack output values as a JSON string keyed by stack name (from `cdktn apply --outputs-file`). Set only after a successful `auto-approve-apply`. Sensitive outputs are excluded. |
 
-For example, to use a stack output as the deployment URL (the `|| '{}'` covers runs where `outputs` is not set):
+For example, to use a stack output as the deployment URL (the `|| '{}'` covers runs where `stackOutputs` is not set):
 
 ```yaml
 jobs:
   deploy:
     environment:
       name: production
-      url: ${{ fromJSON(steps.cdktn.outputs.outputs || '{}').my-stack.url }}
+      url: ${{ fromJSON(steps.cdktn.outputs.stackOutputs || '{}').my-stack.url }}
     steps:
       # ...
       - id: cdktn

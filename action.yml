@@ -82,7 +82,7 @@ outputs:
     description: Exit code returned by the CLI invocation.
   output:
     description: Combined stdout/stderr captured from the CLI invocation.
-  outputs:
+  stackOutputs:
     description: >-
       Stack output values as a JSON string keyed by stack name, from
       `cdktn apply --outputs-file`. Set only after a successful

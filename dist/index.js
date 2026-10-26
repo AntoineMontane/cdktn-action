@@ -21127,7 +21127,7 @@ async function run() {
 	const success = result.exitCode === 0;
 	setOutput("exitCode", result.exitCode);
 	setOutput("output", output);
-	if (outputsFile && success) setOutput("outputs", await readStackOutputs(outputsFile));
+	if (outputsFile && success) setOutput("stackOutputs", await readStackOutputs(outputsFile));
 	if (inputs.commentOnPr) {
 		if (inputs.githubToken) await new CommentController(getOctokit(inputs.githubToken), repoContext()).upsert(inputs, buildCommentBody(inputs, output, success));
 		else warning("commentOnPr is enabled but no githubToken was provided; skipping comment.");

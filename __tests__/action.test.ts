@@ -177,7 +177,10 @@ describe('run', () => {
 
   it('sets the stack outputs as compact JSON after a successful apply', async () => {
     await runAction(ExecutionMode.AutoApproveApply, 0)
-    expect(core.setOutput).toHaveBeenCalledWith('outputs', '{"dev":{"url":"https://example.com"}}')
+    expect(core.setOutput).toHaveBeenCalledWith(
+      'stackOutputs',
+      '{"dev":{"url":"https://example.com"}}',
+    )
   })
 
   it('does not set the stack outputs when the apply fails', async () => {
